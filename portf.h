@@ -14,7 +14,7 @@
 #include "inc/hw_types.h"
 #include "inc/hw_gpio.h"
 
-extern bool fifoflag;
+extern bool FIFO_Flag;
 extern void PortF_Init(void);
 
 

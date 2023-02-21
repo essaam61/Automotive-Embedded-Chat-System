@@ -1,6 +1,6 @@
 #include <portf.h>
 #include <uart0.h>
-#include <can.h>
+#include <Cantp.h>
 #include <statemachine.h>
 
 
@@ -15,7 +15,6 @@ int main(void)
     state = idle; // Declare state variable
 
     int PB1;
-    int j,k;
     Tflag=false;
 
     while (1)
@@ -34,47 +33,34 @@ int main(void)
 
             UART0_ReceiveByte();      //from PC to Tiva
         }
-
         else if(Tflag)
         {
             state = transmission; // Set state variable to the new state
             State_Machine();
 
+            
 
-            IndexData[0]=i;
-            CANMessageSet(CAN0_BASE, ITX_Object, &IndexMessage, MSG_OBJ_TYPE_TX);    //from Tiva1 to Tiva2
-
-            Message_Encryption();  //Enrypting the message in the microcontrollers
-
-            UART0_SendString("\n\rData is being transmitted..\n\r");
-            do
-            {
-                CANSendByte_ErrorHandler();
-
-                if (i < 8) {
-                    for (j=0 ; j<8  ; j++)
-                        pui8MsgData[j]=stringrecv[j];
-                SimpleDelay();
-                CANMessageSet(CAN0_BASE, MSGTX_Object, &sCANMessage, MSG_OBJ_TYPE_TX);             //from Tiva1 to Tiva2
-                sendflag=true;
-                }
-             } while(i>7 && i < length && sendflag==false);
+            IndexData[0] = i;
+            CANMessageSet(CAN0_BASE, ITX_Object, &IndexMessage, MSG_OBJ_TYPE_TX);
 
 
-                     UART0_SendString("\n\rData is SENT\n\r");
-                     Tflag=false;
-                     state = idle; // Set state variable to the new state
+            UART0_EncryptMessage();  //Enrypt the message before sending on the microcontrollers
+
+            UART0_SendString("\n\n\rData is being transmitted..\n\r");
+            CanTp_Transmit(RxBuffer);
+
+            UART0_SendString("\n\rData is SENT\n\r");
+            state = idle; // Set state variable to the new state
+            Tflag=false;
+        }
+        else
+        {
+            CAN_Receive();                     //Tiva2 receive from Tiva1
+            State_Machine();
         }
 
 
-
-        else {
-                        CAN_ReceiveByte();                     //Tiva2 receive from Tiva1
-                        State_Machine();
-        }
-
-
-    } //end of while 1
+    }
 
 
 }

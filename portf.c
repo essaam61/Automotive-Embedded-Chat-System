@@ -1,7 +1,7 @@
 #include <portf.h>
 #include <uart0.h>
 #include <statemachine.h>
-bool fifoflag;
+bool FIFO_Flag = false;
 void GPIOF_Handler (void)
 {
     int PB2;
@@ -9,9 +9,7 @@ void GPIOF_Handler (void)
     // Check when SW2(PF0) is clicked
     if ((PB2 & GPIO_PIN_0) == 0)
     {
-        SimpleDelay();
-        UART0_SendString("\n\rbutton 2 is pressed\n\r");
-        fifoflag=true;
+        FIFO_Flag=true;
     }
 
     // Clear the asserted interrupts.

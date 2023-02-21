@@ -5,9 +5,9 @@
 
 bool Tflag;
 uint8_t g_UART0_received;
-char stringrecv[length];
+uint8_t RxBuffer[DATA_LENGTH];
 uint8_t i;
-int x,e;
+char x,e;
 
 
 
@@ -49,12 +49,16 @@ void UART0_SendByte(char byte)
 void UART0_ReceiveByte(void)
 {
         i=0;
-        fifoflag=false;
+        FIFO_Flag=false;
         /* Return received byte. */
-        while (i < length && fifoflag == false) {
-                g_UART0_received = UART_InChar();
+        while (i < DATA_LENGTH ) {
+                g_UART0_received = UART0_InChar();
+                if(FIFO_Flag==true)
+                {
+                    break;
+                }
 
-                stringrecv[i] = g_UART0_received;
+                RxBuffer[i] = g_UART0_received;
                 i++;
                 UART0_SendByte(g_UART0_received);
         }
@@ -70,21 +74,20 @@ void UART0_SendString(char *pt) {
     }
 }
 
-int UART_InChar(void) {
-  while ((UART0_FR_R & 0x0010) != 0 && fifoflag == false) {}
+int UART0_InChar(void) {
+  while ((UART0_FR_R & 0x0010) != 0 && FIFO_Flag == false) {}
     //wait until RXFE is 0
     return ((unsigned int)(UART0_DR_R&0xFF));
 
 }
 
-void Message_Cryption (void)
+void UART0_EncryptMessage (void)
 {
-       for(e = 0; e < length ; e++)
-         stringrecv[e] = stringrecv[e] + encryption_key; //the key for encryption is 3 that is added to ASCII value
+       for(e = 0; e < DATA_LENGTH ; e++)
+         RxBuffer[e] = RxBuffer[e] + encryption_key; //the key for encryption is 3 that is added to ASCII value
 
-       SimpleDelay();
        UART0_SendString("\n\rEncrypted Message: ");
-       for(e = 0; e < length ; e++)
-           UART0_SendByte(stringrecv[e]);
+       for(e = 0; e < DATA_LENGTH ; e++)
+           UART0_SendByte(RxBuffer[e]);
 
 }

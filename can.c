@@ -1,147 +1,5 @@
-#include "can.h"
-#include <uart0.h>
-#include <statemachine.h>
+#include <can.h>
 
-
-//*****************************************************************************
-//
-// A flag to indicate that some transmission error occurred.
-//
-//*****************************************************************************
-volatile bool g_bErrFlag=0;
-
-//*****************************************************************************
-//
-// A flag for the interrupt handler to indicate that a message was received.
-//
-//*****************************************************************************
-volatile bool g_bRXFlag=0;
-volatile bool g_IRXFlag=0;
-
-void CANIntHandler(void)
-{
-    uint32_t ui32Status;
-
-    //
-    // Read the CAN interrupt status to find the cause of the interrupt
-    //
-    ui32Status = CANIntStatus(CAN0_BASE, CAN_INT_STS_CAUSE);
-
-    //
-    // If the cause is a controller status interrupt, then get the status
-    //
-    if(ui32Status == CAN_INT_INTID_STATUS)
-    {
-        //
-        // Read the controller status.  This will return a field of status
-        // error bits that can indicate various errors.  Error processing
-        // is not done in this example for simplicity.  Refer to the
-        // API documentation for details about the error status bits.
-        // The act of reading this status will clear the interrupt.  If the
-        // CAN peripheral is not connected to a CAN bus with other CAN devices
-        // present, then errors will occur and will be indicated in the
-        // controller status.
-        //
-        ui32Status = CANStatusGet(CAN0_BASE, CAN_STS_CONTROL);
-
-        //
-        // Set a flag to indicate some errors may have occurred.
-        //
-        g_bErrFlag = 1;
-    }
-
-    //
-    // Check if the cause is message object 1, which what we are using for
-    // sending messages.
-    //
-    else if(ui32Status == IRX_Object)
-    {
-        //
-        // Getting to this point means that the TX interrupt occurred on
-        // message object 1, and the message TX is complete.  Clear the
-        // message object interrupt.
-        //
-        CANIntClear(CAN0_BASE, IRX_Object);
-
-
-        //
-        // Set flag to indicate received message is pending.
-        //
-        g_IRXFlag = 1;
-        //
-        // Since the message was sent, clear any error flags.
-        //
-        g_bErrFlag = 0;
-    }
-    else if(ui32Status == MSGRX_Object)
-    {
-        //
-        // Getting to this point means that the TX interrupt occurred on
-        // message object 1, and the message TX is complete.  Clear the
-        // message object interrupt.
-        //
-        CANIntClear(CAN0_BASE, MSGRX_Object);
-
-
-        //
-        // Set flag to indicate received message is pending.
-        //
-        g_bRXFlag = 1;
-        //
-        // Since the message was sent, clear any error flags.
-        //
-        g_bErrFlag = 0;
-    }
-
-    else if(ui32Status == MSGTX_Object )
-    {
-        //
-        // Getting to this point means that the TX interrupt occurred on
-        // message object TXOBJECT, and the message reception is complete.
-        // Clear the message object interrupt.
-        //
-        CANIntClear(CAN0_BASE, MSGTX_Object);
-
-        //
-        // Since a message was transmitted, clear any error flags.
-        // This is done because before the message is transmitted it triggers
-        // a Status Interrupt for TX complete. by clearing the flag here we
-        // prevent unnecessary error handling from happeneing
-        //
-        g_bErrFlag  = 0;
-    }
-    else if(ui32Status == ITX_Object )
-    {
-        //
-        // Getting to this point means that the TX interrupt occurred on
-        // message object TXOBJECT, and the message reception is complete.
-        // Clear the message object interrupt.
-        //
-        CANIntClear(CAN0_BASE, ITX_Object);
-
-        //
-        // Since a message was transmitted, clear any error flags.
-        // This is done because before the message is transmitted it triggers
-        // a Status Interrupt for TX complete. by clearing the flag here we
-        // prevent unnecessary error handling from happeneing
-        //
-        g_bErrFlag  = 0;
-    }
-
-
-    //
-    // Otherwise, something unexpected caused the interrupt.  This should
-    // never happen.
-    //
-    else
-    {
-        //
-        // Spurious interrupt handling can go here.
-        //
-    }
-}
-
-////////////////////////////////////////////////////////////////////////////////////
 
 tCANMsgObject sCANMessage;
 uint8_t pui8MsgData[8];
@@ -153,6 +11,8 @@ uint8_t IndexData[8];
 tCANMsgObject sCANMessageRX;
 uint8_t pui8MsgDataRX[8];
 
+char Idx;
+uint8_t canstringrecv[DATA_LENGTH];
 
 void CAN_Init(void)
 {
@@ -315,13 +175,153 @@ void CAN_Init(void)
 
 }
 
+////////////////////////////////////////////////////////////////////////////////////
 
-int Idx;
 
-void CAN_ReceiveByte (void) {
+//*****************************************************************************
+//
+// A flag to indicate that some transmission error occurred.
+//
+//*****************************************************************************
+volatile bool g_bErrFlag=0;
+
+//*****************************************************************************
+//
+// A flag for the interrupt handler to indicate that a message was received.
+//
+//*****************************************************************************
+volatile bool g_bRXFlag=0;
+volatile bool g_IRXFlag=0;
+
+void CANIntHandler(void)
+{
+    uint32_t ui32Status;
+
+    //
+    // Read the CAN interrupt status to find the cause of the interrupt
+    //
+    ui32Status = CANIntStatus(CAN0_BASE, CAN_INT_STS_CAUSE);
+
+    //
+    // If the cause is a controller status interrupt, then get the status
+    //
+    if(ui32Status == CAN_INT_INTID_STATUS)
+    {
+        //
+        // Read the controller status.  This will return a field of status
+        // error bits that can indicate various errors.  Error processing
+        // is not done in this example for simplicity.  Refer to the
+        // API documentation for details about the error status bits.
+        // The act of reading this status will clear the interrupt.  If the
+        // CAN peripheral is not connected to a CAN bus with other CAN devices
+        // present, then errors will occur and will be indicated in the
+        // controller status.
+        //
+        ui32Status = CANStatusGet(CAN0_BASE, CAN_STS_CONTROL);
+
+        //
+        // Set a flag to indicate some errors may have occurred.
+        //
+        g_bErrFlag = 1;
+    }
+
+    //
+    // Check if the cause is message object 1, which what we are using for
+    // sending messages.
+    //
+    else if(ui32Status == IRX_Object)
+    {
+        //
+        // Getting to this point means that the TX interrupt occurred on
+        // message object 1, and the message TX is complete.  Clear the
+        // message object interrupt.
+        //
+        CANIntClear(CAN0_BASE, IRX_Object);
+
+
+        //
+        // Set flag to indicate received message is pending.
+        //
+        g_IRXFlag = 1;
+        //
+        // Since the message was sent, clear any error flags.
+        //
+        g_bErrFlag = 0;
+    }
+    else if(ui32Status == MSGRX_Object)
+    {
+        //
+        // Getting to this point means that the TX interrupt occurred on
+        // message object 1, and the message TX is complete.  Clear the
+        // message object interrupt.
+        //
+        CANIntClear(CAN0_BASE, MSGRX_Object);
+
+
+        //
+        // Set flag to indicate received message is pending.
+        //
+        g_bRXFlag = 1;
+        //
+        // Since the message was sent, clear any error flags.
+        //
+        g_bErrFlag = 0;
+    }
+
+    else if(ui32Status == MSGTX_Object )
+    {
+        //
+        // Getting to this point means that the TX interrupt occurred on
+        // message object TXOBJECT, and the message reception is complete.
+        // Clear the message object interrupt.
+        //
+        CANIntClear(CAN0_BASE, MSGTX_Object);
+
+        //
+        // Since a message was transmitted, clear any error flags.
+        // This is done because before the message is transmitted it triggers
+        // a Status Interrupt for TX complete. by clearing the flag here we
+        // prevent unnecessary error handling from happeneing
+        //
+        g_bErrFlag  = 0;
+    }
+    else if(ui32Status == ITX_Object )
+    {
+        //
+        // Getting to this point means that the TX interrupt occurred on
+        // message object TXOBJECT, and the message reception is complete.
+        // Clear the message object interrupt.
+        //
+        CANIntClear(CAN0_BASE, ITX_Object);
+
+        //
+        // Since a message was transmitted, clear any error flags.
+        // This is done because before the message is transmitted it triggers
+        // a Status Interrupt for TX complete. by clearing the flag here we
+        // prevent unnecessary error handling from happeneing
+        //
+        g_bErrFlag  = 0;
+    }
+
+
+    //
+    // Otherwise, something unexpected caused the interrupt.  This should
+    // never happen.
+    //
+    else
+    {
+        //
+        // Spurious interrupt handling can go here.
+        //
+    }
+}
+
+void CAN_Receive (void) {
     if(g_bRXFlag)
         {
             state=reception;
+            char RxData_Idx;
+            static char RxMessage_ByteNO=0;
 
             //
             // Reuse the same message object that was used earlier to configure
@@ -338,7 +338,18 @@ void CAN_ReceiveByte (void) {
             // the interrupt handler.
             //
             CANMessageGet(CAN0_BASE, MSGRX_Object, &sCANMessageRX, 0);             //Tiva2 receive from Tiva1
-            CANReceiveByte_ErrorHandler();
+
+            for (RxData_Idx=0 ; RxData_Idx <= 7  ; RxData_Idx++) {
+                canstringrecv[RxMessage_ByteNO]=pui8MsgDataRX[RxData_Idx];
+                RxMessage_ByteNO++;
+
+                if(RxMessage_ByteNO==DATA_LENGTH)
+                {
+                    RxMessage_ByteNO=0;
+                    state = presenting;  // Set state variable to the new state
+
+                }
+            }
 
 
             //
@@ -364,1082 +375,3 @@ void CAN_ReceiveByte (void) {
 
 }
 
-///////////////////////////////////////////////
-///////////////////////////////////////////////
-///////////////////////////////////////////////
-
-int counter;
-bool sendflag=false;
-
-void CANSendByte_ErrorHandler (void)
-{
-    int j,v;
-    if(i>=8 && i <=15)
-    {
-        counter=0;
-        for(v=0 ; v < 2 ; v++) {
-            for (j=counter ; j<(counter+7)  ; j++) {
-                     pui8MsgData[j]=stringrecv[j];      }
-        //
-       CANMessageSet(CAN0_BASE, MSGTX_Object, &sCANMessage, MSG_OBJ_TYPE_TX);             //from Tiva1 to Tiva2
-        //
-        counter=8;
-        }
-        sendflag=true;
-
-    }
-    else if(i>=16 && i <=23){
-        counter=0;
-        for(v=0 ; v < 2 ; v++) {
-            for (j=counter ; j<(counter+7)  ; j++) {
-                     pui8MsgData[j]=stringrecv[j];      }
-        //
-       CANMessageSet(CAN0_BASE, MSGTX_Object, &sCANMessage, MSG_OBJ_TYPE_TX);             //from Tiva1 to Tiva2
-        //
-        counter=8;
-        }
-
-        counter=16;
-        for (j=counter ; j<(counter+7)  ; j++) {
-                      pui8MsgData[j]=stringrecv[j];      }
-         //
-        CANMessageSet(CAN0_BASE, MSGTX_Object, &sCANMessage, MSG_OBJ_TYPE_TX);             //from Tiva1 to Tiva2
-         //
-        sendflag=true;
-    }
-    else if(i>=24 && i <=31){
-        counter=0;
-        for(v=0 ; v < 2 ; v++) {
-            for (j=counter ; j<(counter+7)  ; j++) {
-                     pui8MsgData[j]=stringrecv[j];      }
-        //
-        CANMessageSet(CAN0_BASE, MSGTX_Object, &sCANMessage, MSG_OBJ_TYPE_TX);             //from Tiva1 to Tiva2
-        //
-        counter=8;
-        }
-
-        counter=16;
-        for (j=counter ; j<(counter+7)  ; j++) {
-                      pui8MsgData[j]=stringrecv[j];      }
-         //
-        CANMessageSet(CAN0_BASE, MSGTX_Object, &sCANMessage, MSG_OBJ_TYPE_TX);             //from Tiva1 to Tiva2
-         //
-
-         counter=24;
-         for (j=counter ; j<(counter+7)  ; j++) {
-                       pui8MsgData[j]=stringrecv[j];      }
-          //
-         CANMessageSet(CAN0_BASE, MSGTX_Object, &sCANMessage, MSG_OBJ_TYPE_TX);             //from Tiva1 to Tiva2
-          //
-        sendflag=true;
-    }
-    else if(i>=32 && i <=39){
-        counter=0;
-        for(v=0 ; v < 2 ; v++) {
-            for (j=counter ; j<(counter+7)  ; j++) {
-                     pui8MsgData[j]=stringrecv[j];      }
-        //
-            CANMessageSet(CAN0_BASE, MSGTX_Object, &sCANMessage, MSG_OBJ_TYPE_TX);             //from Tiva1 to Tiva2
-        //
-        counter=8;
-        }
-
-        counter=16;
-        for (j=counter ; j<(counter+7)  ; j++) {
-                      pui8MsgData[j]=stringrecv[j];      }
-         //
-        CANMessageSet(CAN0_BASE, MSGTX_Object, &sCANMessage, MSG_OBJ_TYPE_TX);             //from Tiva1 to Tiva2
-         //
-
-         counter=24;
-         for (j=counter ; j<(counter+7)  ; j++) {
-                       pui8MsgData[j]=stringrecv[j];      }
-          //
-         CANMessageSet(CAN0_BASE, MSGTX_Object, &sCANMessage, MSG_OBJ_TYPE_TX);             //from Tiva1 to Tiva2
-          //
-
-          counter=32;
-          for (j=counter ; j<(counter+7)  ; j++) {
-                        pui8MsgData[j]=stringrecv[j];      }
-           //
-          CANMessageSet(CAN0_BASE, MSGTX_Object, &sCANMessage, MSG_OBJ_TYPE_TX);             //from Tiva1 to Tiva2
-           //
-
-        sendflag=true;
-    }
-    else if(i>=40 && i <=47){
-        counter=0;
-        for(v=0 ; v < 2 ; v++) {
-            for (j=counter ; j<(counter+7)  ; j++) {
-                     pui8MsgData[j]=stringrecv[j];      }
-        //
-        CANMessageSet(CAN0_BASE, MSGTX_Object, &sCANMessage, MSG_OBJ_TYPE_TX);             //from Tiva1 to Tiva2
-        //
-        counter=8;
-        }
-
-        counter=16;
-        for (j=counter ; j<(counter+7)  ; j++) {
-                      pui8MsgData[j]=stringrecv[j];      }
-         //
-        CANMessageSet(CAN0_BASE, MSGTX_Object, &sCANMessage, MSG_OBJ_TYPE_TX);             //from Tiva1 to Tiva2
-         //
-
-         counter=24;
-         for (j=counter ; j<(counter+7)  ; j++) {
-                       pui8MsgData[j]=stringrecv[j];      }
-          //
-         CANMessageSet(CAN0_BASE, MSGTX_Object, &sCANMessage, MSG_OBJ_TYPE_TX);             //from Tiva1 to Tiva2
-          //
-
-          counter=32;
-          for (j=counter ; j<(counter+7)  ; j++) {
-                        pui8MsgData[j]=stringrecv[j];      }
-           //
-          CANMessageSet(CAN0_BASE, MSGTX_Object, &sCANMessage, MSG_OBJ_TYPE_TX);             //from Tiva1 to Tiva2
-           //
-
-           counter=40;
-           for (j=counter ; j<(counter+7)  ; j++) {
-                         pui8MsgData[j]=stringrecv[j];      }
-            //
-           CANMessageSet(CAN0_BASE, MSGTX_Object, &sCANMessage, MSG_OBJ_TYPE_TX);             //from Tiva1 to Tiva2
-            //
-
-        sendflag=true;
-    }
-    else if(i>=48 && i <=55){
-        counter=0;
-        for(v=0 ; v < 2 ; v++) {
-            for (j=counter ; j<(counter+7)  ; j++) {
-                     pui8MsgData[j]=stringrecv[j];      }
-        //
-            CANMessageSet(CAN0_BASE, MSGTX_Object, &sCANMessage, MSG_OBJ_TYPE_TX);             //from Tiva1 to Tiva2
-        //
-        counter=8;
-        }
-
-        counter=16;
-        for (j=counter ; j<(counter+7)  ; j++) {
-                      pui8MsgData[j]=stringrecv[j];      }
-         //
-        CANMessageSet(CAN0_BASE, MSGTX_Object, &sCANMessage, MSG_OBJ_TYPE_TX);             //from Tiva1 to Tiva2
-         //
-
-         counter=24;
-         for (j=counter ; j<(counter+7)  ; j++) {
-                       pui8MsgData[j]=stringrecv[j];      }
-          //
-         CANMessageSet(CAN0_BASE, MSGTX_Object, &sCANMessage, MSG_OBJ_TYPE_TX);             //from Tiva1 to Tiva2
-          //
-
-          counter=32;
-          for (j=counter ; j<(counter+7)  ; j++) {
-                        pui8MsgData[j]=stringrecv[j];      }
-           //
-          CANMessageSet(CAN0_BASE, MSGTX_Object, &sCANMessage, MSG_OBJ_TYPE_TX);             //from Tiva1 to Tiva2
-           //
-
-           counter=40;
-           for (j=counter ; j<(counter+7)  ; j++) {
-                         pui8MsgData[j]=stringrecv[j];      }
-            //
-           CANMessageSet(CAN0_BASE, MSGTX_Object, &sCANMessage, MSG_OBJ_TYPE_TX);             //from Tiva1 to Tiva2
-            //
-
-            counter=48;
-            for (j=counter ; j<(counter+7)  ; j++) {
-                          pui8MsgData[j]=stringrecv[j];      }
-             //
-            CANMessageSet(CAN0_BASE, MSGTX_Object, &sCANMessage, MSG_OBJ_TYPE_TX);             //from Tiva1 to Tiva2
-             //
-
-        sendflag=true;
-    }
-    else if(i>=56 && i <=63){
-        counter=0;
-        for(v=0 ; v < 2 ; v++) {
-            for (j=counter ; j<(counter+7)  ; j++) {
-                     pui8MsgData[j]=stringrecv[j];      }
-        //
-            CANMessageSet(CAN0_BASE, MSGTX_Object, &sCANMessage, MSG_OBJ_TYPE_TX);             //from Tiva1 to Tiva2
-        //
-        counter=8;
-        }
-
-        counter=16;
-        for (j=counter ; j<(counter+7)  ; j++) {
-                      pui8MsgData[j]=stringrecv[j];      }
-         //
-        CANMessageSet(CAN0_BASE, MSGTX_Object, &sCANMessage, MSG_OBJ_TYPE_TX);             //from Tiva1 to Tiva2
-         //
-
-         counter=24;
-         for (j=counter ; j<(counter+7)  ; j++) {
-                       pui8MsgData[j]=stringrecv[j];      }
-          //
-         CANMessageSet(CAN0_BASE, MSGTX_Object, &sCANMessage, MSG_OBJ_TYPE_TX);             //from Tiva1 to Tiva2
-          //
-
-          counter=32;
-          for (j=counter ; j<(counter+7)  ; j++) {
-                        pui8MsgData[j]=stringrecv[j];      }
-           //
-          CANMessageSet(CAN0_BASE, MSGTX_Object, &sCANMessage, MSG_OBJ_TYPE_TX);             //from Tiva1 to Tiva2
-           //
-
-           counter=40;
-           for (j=counter ; j<(counter+7)  ; j++) {
-                         pui8MsgData[j]=stringrecv[j];      }
-            //
-           CANMessageSet(CAN0_BASE, MSGTX_Object, &sCANMessage, MSG_OBJ_TYPE_TX);             //from Tiva1 to Tiva2
-            //
-
-            counter=48;
-            for (j=counter ; j<(counter+7)  ; j++) {
-                          pui8MsgData[j]=stringrecv[j];      }
-             //
-            CANMessageSet(CAN0_BASE, MSGTX_Object, &sCANMessage, MSG_OBJ_TYPE_TX);             //from Tiva1 to Tiva2
-             //
-
-             counter=56;
-             for (j=counter ; j<(counter+7)  ; j++) {
-                           pui8MsgData[j]=stringrecv[j];      }
-              //
-             CANMessageSet(CAN0_BASE, MSGTX_Object, &sCANMessage, MSG_OBJ_TYPE_TX);             //from Tiva1 to Tiva2
-              //
-
-        sendflag=true;
-    }
-
-    else if(i>=64 && i <=71){
-        counter=0;
-        for(v=0 ; v < 2 ; v++) {
-            for (j=counter ; j<(counter+7)  ; j++) {
-                     pui8MsgData[j]=stringrecv[j];      }
-        //
-            CANMessageSet(CAN0_BASE, MSGTX_Object, &sCANMessage, MSG_OBJ_TYPE_TX);             //from Tiva1 to Tiva2
-        //
-        counter=8;
-        }
-
-        counter=16;
-        for (j=counter ; j<(counter+7)  ; j++) {
-                      pui8MsgData[j]=stringrecv[j];      }
-         //
-        CANMessageSet(CAN0_BASE, MSGTX_Object, &sCANMessage, MSG_OBJ_TYPE_TX);             //from Tiva1 to Tiva2
-         //
-
-         counter=24;
-         for (j=counter ; j<(counter+7)  ; j++) {
-                       pui8MsgData[j]=stringrecv[j];      }
-          //
-         CANMessageSet(CAN0_BASE, MSGTX_Object, &sCANMessage, MSG_OBJ_TYPE_TX);             //from Tiva1 to Tiva2
-          //
-
-          counter=32;
-          for (j=counter ; j<(counter+7)  ; j++) {
-                        pui8MsgData[j]=stringrecv[j];      }
-           //
-          CANMessageSet(CAN0_BASE, MSGTX_Object, &sCANMessage, MSG_OBJ_TYPE_TX);             //from Tiva1 to Tiva2
-           //
-
-           counter=40;
-           for (j=counter ; j<(counter+7)  ; j++) {
-                         pui8MsgData[j]=stringrecv[j];      }
-            //
-           CANMessageSet(CAN0_BASE, MSGTX_Object, &sCANMessage, MSG_OBJ_TYPE_TX);             //from Tiva1 to Tiva2
-            //
-
-            counter=48;
-            for (j=counter ; j<(counter+7)  ; j++) {
-                          pui8MsgData[j]=stringrecv[j];      }
-             //
-            CANMessageSet(CAN0_BASE, MSGTX_Object, &sCANMessage, MSG_OBJ_TYPE_TX);             //from Tiva1 to Tiva2
-             //
-
-             counter=56;
-             for (j=counter ; j<(counter+7)  ; j++) {
-                           pui8MsgData[j]=stringrecv[j];      }
-              //
-             CANMessageSet(CAN0_BASE, MSGTX_Object, &sCANMessage, MSG_OBJ_TYPE_TX);             //from Tiva1 to Tiva2
-              //
-
-              counter=64;
-              for (j=counter ; j<(counter+7)  ; j++) {
-                            pui8MsgData[j]=stringrecv[j];      }
-               //
-              CANMessageSet(CAN0_BASE, MSGTX_Object, &sCANMessage, MSG_OBJ_TYPE_TX);             //from Tiva1 to Tiva2
-               //
-
-        sendflag=true;
-    }
-    else if(i>=79 && i <=86){
-        counter=0;
-        for(v=0 ; v < 2 ; v++) {
-            for (j=counter ; j<(counter+7)  ; j++) {
-                     pui8MsgData[j]=stringrecv[j];      }
-        //
-            CANMessageSet(CAN0_BASE, MSGTX_Object, &sCANMessage, MSG_OBJ_TYPE_TX);             //from Tiva1 to Tiva2
-        //
-        counter=8;
-        }
-
-        counter=16;
-        for (j=counter ; j<(counter+7)  ; j++) {
-                      pui8MsgData[j]=stringrecv[j];      }
-         //
-        CANMessageSet(CAN0_BASE, MSGTX_Object, &sCANMessage, MSG_OBJ_TYPE_TX);             //from Tiva1 to Tiva2
-         //
-
-         counter=24;
-         for (j=counter ; j<(counter+7)  ; j++) {
-                       pui8MsgData[j]=stringrecv[j];      }
-          //
-         CANMessageSet(CAN0_BASE, MSGTX_Object, &sCANMessage, MSG_OBJ_TYPE_TX);             //from Tiva1 to Tiva2
-          //
-
-          counter=32;
-          for (j=counter ; j<(counter+7)  ; j++) {
-                        pui8MsgData[j]=stringrecv[j];      }
-           //
-          CANMessageSet(CAN0_BASE, MSGTX_Object, &sCANMessage, MSG_OBJ_TYPE_TX);             //from Tiva1 to Tiva2
-           //
-
-           counter=40;
-           for (j=counter ; j<(counter+7)  ; j++) {
-                         pui8MsgData[j]=stringrecv[j];      }
-            //
-           CANMessageSet(CAN0_BASE, MSGTX_Object, &sCANMessage, MSG_OBJ_TYPE_TX);             //from Tiva1 to Tiva2
-            //
-
-            counter=48;
-            for (j=counter ; j<(counter+7)  ; j++) {
-                          pui8MsgData[j]=stringrecv[j];      }
-             //
-            CANMessageSet(CAN0_BASE, MSGTX_Object, &sCANMessage, MSG_OBJ_TYPE_TX);             //from Tiva1 to Tiva2
-             //
-
-             counter=56;
-             for (j=counter ; j<(counter+7)  ; j++) {
-                           pui8MsgData[j]=stringrecv[j];      }
-              //
-             CANMessageSet(CAN0_BASE, MSGTX_Object, &sCANMessage, MSG_OBJ_TYPE_TX);             //from Tiva1 to Tiva2
-              //
-
-              counter=64;
-              for (j=counter ; j<(counter+7)  ; j++) {
-                            pui8MsgData[j]=stringrecv[j];      }
-               //
-              CANMessageSet(CAN0_BASE, MSGTX_Object, &sCANMessage, MSG_OBJ_TYPE_TX);             //from Tiva1 to Tiva2
-               //
-
-               counter=79;
-               for (j=counter ; j<(counter+7)  ; j++) {
-                             pui8MsgData[j]=stringrecv[j];      }
-                //
-               CANMessageSet(CAN0_BASE, MSGTX_Object, &sCANMessage, MSG_OBJ_TYPE_TX);             //from Tiva1 to Tiva2
-                //
-
-        sendflag=true;
-    }
-    else if(i>=87 && i <=94){
-        counter=0;
-        for(v=0 ; v < 2 ; v++) {
-            for (j=counter ; j<(counter+7)  ; j++) {
-                     pui8MsgData[j]=stringrecv[j];      }
-        //
-            CANMessageSet(CAN0_BASE, MSGTX_Object, &sCANMessage, MSG_OBJ_TYPE_TX);             //from Tiva1 to Tiva2
-        //
-        counter=8;
-        }
-
-        counter=16;
-        for (j=counter ; j<(counter+7)  ; j++) {
-                      pui8MsgData[j]=stringrecv[j];      }
-         //
-        CANMessageSet(CAN0_BASE, MSGTX_Object, &sCANMessage, MSG_OBJ_TYPE_TX);             //from Tiva1 to Tiva2
-         //
-
-         counter=24;
-         for (j=counter ; j<(counter+7)  ; j++) {
-                       pui8MsgData[j]=stringrecv[j];      }
-          //
-         CANMessageSet(CAN0_BASE, MSGTX_Object, &sCANMessage, MSG_OBJ_TYPE_TX);             //from Tiva1 to Tiva2
-          //
-
-          counter=32;
-          for (j=counter ; j<(counter+7)  ; j++) {
-                        pui8MsgData[j]=stringrecv[j];      }
-           //
-          CANMessageSet(CAN0_BASE, MSGTX_Object, &sCANMessage, MSG_OBJ_TYPE_TX);             //from Tiva1 to Tiva2
-           //
-
-           counter=40;
-           for (j=counter ; j<(counter+7)  ; j++) {
-                         pui8MsgData[j]=stringrecv[j];      }
-            //
-           CANMessageSet(CAN0_BASE, MSGTX_Object, &sCANMessage, MSG_OBJ_TYPE_TX);             //from Tiva1 to Tiva2
-            //
-
-            counter=48;
-            for (j=counter ; j<(counter+7)  ; j++) {
-                          pui8MsgData[j]=stringrecv[j];      }
-             //
-            CANMessageSet(CAN0_BASE, MSGTX_Object, &sCANMessage, MSG_OBJ_TYPE_TX);             //from Tiva1 to Tiva2
-             //
-
-             counter=56;
-             for (j=counter ; j<(counter+7)  ; j++) {
-                           pui8MsgData[j]=stringrecv[j];      }
-              //
-             CANMessageSet(CAN0_BASE, MSGTX_Object, &sCANMessage, MSG_OBJ_TYPE_TX);             //from Tiva1 to Tiva2
-              //
-
-              counter=64;
-              for (j=counter ; j<(counter+7)  ; j++) {
-                            pui8MsgData[j]=stringrecv[j];      }
-               //
-              CANMessageSet(CAN0_BASE, MSGTX_Object, &sCANMessage, MSG_OBJ_TYPE_TX);             //from Tiva1 to Tiva2
-               //
-
-               counter=79;
-               for (j=counter ; j<(counter+7)  ; j++) {
-                             pui8MsgData[j]=stringrecv[j];      }
-                //
-               CANMessageSet(CAN0_BASE, MSGTX_Object, &sCANMessage, MSG_OBJ_TYPE_TX);             //from Tiva1 to Tiva2
-                //
-
-                counter=87;
-                for (j=counter ; j<(counter+7)  ; j++) {
-                              pui8MsgData[j]=stringrecv[j];      }
-                 //
-                CANMessageSet(CAN0_BASE, MSGTX_Object, &sCANMessage, MSG_OBJ_TYPE_TX);             //from Tiva1 to Tiva2
-                 //
-        sendflag=true;
-    }
-    else if(i>=95 && i <=102){
-        counter=0;
-        for(v=0 ; v < 2 ; v++) {
-            for (j=counter ; j<(counter+7)  ; j++) {
-                     pui8MsgData[j]=stringrecv[j];      }
-        //
-            CANMessageSet(CAN0_BASE, MSGTX_Object, &sCANMessage, MSG_OBJ_TYPE_TX);             //from Tiva1 to Tiva2
-        //
-        counter=8;
-        }
-
-        counter=16;
-        for (j=counter ; j<(counter+7)  ; j++) {
-                      pui8MsgData[j]=stringrecv[j];      }
-         //
-        CANMessageSet(CAN0_BASE, MSGTX_Object, &sCANMessage, MSG_OBJ_TYPE_TX);             //from Tiva1 to Tiva2
-         //
-
-         counter=24;
-         for (j=counter ; j<(counter+7)  ; j++) {
-                       pui8MsgData[j]=stringrecv[j];      }
-          //
-         CANMessageSet(CAN0_BASE, MSGTX_Object, &sCANMessage, MSG_OBJ_TYPE_TX);             //from Tiva1 to Tiva2
-          //
-
-          counter=32;
-          for (j=counter ; j<(counter+7)  ; j++) {
-                        pui8MsgData[j]=stringrecv[j];      }
-           //
-          CANMessageSet(CAN0_BASE, MSGTX_Object, &sCANMessage, MSG_OBJ_TYPE_TX);             //from Tiva1 to Tiva2
-           //
-
-           counter=40;
-           for (j=counter ; j<(counter+7)  ; j++) {
-                         pui8MsgData[j]=stringrecv[j];      }
-            //
-           CANMessageSet(CAN0_BASE, MSGTX_Object, &sCANMessage, MSG_OBJ_TYPE_TX);             //from Tiva1 to Tiva2
-            //
-
-            counter=48;
-            for (j=counter ; j<(counter+7)  ; j++) {
-                          pui8MsgData[j]=stringrecv[j];      }
-             //
-            CANMessageSet(CAN0_BASE, MSGTX_Object, &sCANMessage, MSG_OBJ_TYPE_TX);             //from Tiva1 to Tiva2
-             //
-
-             counter=56;
-             for (j=counter ; j<(counter+7)  ; j++) {
-                           pui8MsgData[j]=stringrecv[j];      }
-              //
-             CANMessageSet(CAN0_BASE, MSGTX_Object, &sCANMessage, MSG_OBJ_TYPE_TX);             //from Tiva1 to Tiva2
-              //
-
-              counter=64;
-              for (j=counter ; j<(counter+7)  ; j++) {
-                            pui8MsgData[j]=stringrecv[j];      }
-               //
-              CANMessageSet(CAN0_BASE, MSGTX_Object, &sCANMessage, MSG_OBJ_TYPE_TX);             //from Tiva1 to Tiva2
-               //
-
-               counter=79;
-               for (j=counter ; j<(counter+7)  ; j++) {
-                             pui8MsgData[j]=stringrecv[j];      }
-                //
-               CANMessageSet(CAN0_BASE, MSGTX_Object, &sCANMessage, MSG_OBJ_TYPE_TX);             //from Tiva1 to Tiva2
-                //
-
-                counter=87;
-                for (j=counter ; j<(counter+7)  ; j++) {
-                              pui8MsgData[j]=stringrecv[j];      }
-                 //
-                CANMessageSet(CAN0_BASE, MSGTX_Object, &sCANMessage, MSG_OBJ_TYPE_TX);             //from Tiva1 to Tiva2
-                 //
-                 counter=95;
-                 for (j=counter ; j<(counter+7)  ; j++) {
-                               pui8MsgData[j]=stringrecv[j];      }
-                  //
-                 CANMessageSet(CAN0_BASE, MSGTX_Object, &sCANMessage, MSG_OBJ_TYPE_TX);             //from Tiva1 to Tiva2
-                  //
-        sendflag=true;
-    }
-    else
-    {
-    //
-    }
-}
-
-char canstringrecv[length];
-
-extern void CANReceiveByte_ErrorHandler (void) {
-    int j,v;
-    if(Idx>=8 && Idx <=15)
-    {
-        counter=0;
-        for(v=0 ; v < 2 ; v++) {
-            for (j=counter ; j<(counter+7)  ; j++) {
-                     canstringrecv[j]=pui8MsgDataRX[j];      }
-        //
-
-        //
-        counter=8;
-        }
-
-
-    }
-    else if(Idx>=16 && Idx <=23){
-        counter=0;
-        for(v=0 ; v < 2 ; v++) {
-            for (j=counter ; j<(counter+7)  ; j++) {
-                     canstringrecv[j]=pui8MsgDataRX[j];      }
-        //
-
-        //
-        counter=8;
-        }
-
-        counter=16;
-        for (j=counter ; j<(counter+7)  ; j++) {
-                      canstringrecv[j]=pui8MsgDataRX[j];      }
-         //
-
-         //
-
-    }
-    else if(Idx>=24 && Idx <=31){
-        counter=0;
-        for(v=0 ; v < 2 ; v++) {
-            for (j=counter ; j<(counter+7)  ; j++) {
-                     canstringrecv[j]=pui8MsgDataRX[j];      }
-        //
-
-        //
-        counter=8;
-        }
-
-        counter=16;
-        for (j=counter ; j<(counter+7)  ; j++) {
-                      canstringrecv[j]=pui8MsgDataRX[j];      }
-         //
-
-         //
-
-         counter=24;
-         for (j=counter ; j<(counter+7)  ; j++) {
-                       canstringrecv[j]=pui8MsgDataRX[j];      }
-          //
-
-          //
-
-    }
-    else if(Idx>=32 && Idx <=39){
-        counter=0;
-        for(v=0 ; v < 2 ; v++) {
-            for (j=counter ; j<(counter+7)  ; j++) {
-                     canstringrecv[j]=pui8MsgDataRX[j];      }
-        //
-
-        //
-        counter=8;
-        }
-
-        counter=16;
-        for (j=counter ; j<(counter+7)  ; j++) {
-                      canstringrecv[j]=pui8MsgDataRX[j];      }
-         //
-
-         //
-
-         counter=24;
-         for (j=counter ; j<(counter+7)  ; j++) {
-                       canstringrecv[j]=pui8MsgDataRX[j];      }
-          //
-
-          //
-
-          counter=32;
-          for (j=counter ; j<(counter+7)  ; j++) {
-                        canstringrecv[j]=pui8MsgDataRX[j];      }
-           //
-
-           //
-
-
-    }
-    else if(Idx>=40 && Idx <=47){
-        counter=0;
-        for(v=0 ; v < 2 ; v++) {
-            for (j=counter ; j<(counter+7)  ; j++) {
-                     canstringrecv[j]=pui8MsgDataRX[j];      }
-        //
-
-        //
-        counter=8;
-        }
-
-        counter=16;
-        for (j=counter ; j<(counter+7)  ; j++) {
-                      canstringrecv[j]=pui8MsgDataRX[j];      }
-         //
-
-         //
-
-         counter=24;
-         for (j=counter ; j<(counter+7)  ; j++) {
-                       canstringrecv[j]=pui8MsgDataRX[j];      }
-          //
-
-          //
-
-          counter=32;
-          for (j=counter ; j<(counter+7)  ; j++) {
-                        canstringrecv[j]=pui8MsgDataRX[j];      }
-           //
-
-           //
-
-           counter=40;
-           for (j=counter ; j<(counter+7)  ; j++) {
-                         canstringrecv[j]=pui8MsgDataRX[j];      }
-            //
-
-            //
-
-
-    }
-    else if(Idx>=48 && Idx <=55){
-        counter=0;
-        for(v=0 ; v < 2 ; v++) {
-            for (j=counter ; j<(counter+7)  ; j++) {
-                     canstringrecv[j]=pui8MsgDataRX[j];      }
-        //
-
-        //
-        counter=8;
-        }
-
-        counter=16;
-        for (j=counter ; j<(counter+7)  ; j++) {
-                      canstringrecv[j]=pui8MsgDataRX[j];      }
-         //
-
-         //
-
-         counter=24;
-         for (j=counter ; j<(counter+7)  ; j++) {
-                       canstringrecv[j]=pui8MsgDataRX[j];      }
-          //
-
-          //
-
-          counter=32;
-          for (j=counter ; j<(counter+7)  ; j++) {
-                        canstringrecv[j]=pui8MsgDataRX[j];      }
-           //
-
-           //
-
-           counter=40;
-           for (j=counter ; j<(counter+7)  ; j++) {
-                         canstringrecv[j]=pui8MsgDataRX[j];      }
-            //
-
-            //
-
-            counter=48;
-            for (j=counter ; j<(counter+7)  ; j++) {
-                          canstringrecv[j]=pui8MsgDataRX[j];      }
-             //
-
-             //
-
-
-    }
-    else if(Idx>=56 && Idx <=63){
-        counter=0;
-        for(v=0 ; v < 2 ; v++) {
-            for (j=counter ; j<(counter+7)  ; j++) {
-                     canstringrecv[j]=pui8MsgDataRX[j];      }
-        //
-
-        //
-        counter=8;
-        }
-
-        counter=16;
-        for (j=counter ; j<(counter+7)  ; j++) {
-                      canstringrecv[j]=pui8MsgDataRX[j];      }
-         //
-
-         //
-
-         counter=24;
-         for (j=counter ; j<(counter+7)  ; j++) {
-                       canstringrecv[j]=pui8MsgDataRX[j];      }
-          //
-
-          //
-
-          counter=32;
-          for (j=counter ; j<(counter+7)  ; j++) {
-                        canstringrecv[j]=pui8MsgDataRX[j];      }
-           //
-
-           //
-
-           counter=40;
-           for (j=counter ; j<(counter+7)  ; j++) {
-                         canstringrecv[j]=pui8MsgDataRX[j];      }
-            //
-
-            //
-
-            counter=48;
-            for (j=counter ; j<(counter+7)  ; j++) {
-                          canstringrecv[j]=pui8MsgDataRX[j];      }
-             //
-
-             //
-
-             counter=56;
-             for (j=counter ; j<(counter+7)  ; j++) {
-                           canstringrecv[j]=pui8MsgDataRX[j];      }
-              //
-
-              //
-
-
-    }
-
-    else if(Idx>=64 && Idx <=71){
-        counter=0;
-        for(v=0 ; v < 2 ; v++) {
-            for (j=counter ; j<(counter+7)  ; j++) {
-                     canstringrecv[j]=pui8MsgDataRX[j];      }
-        //
-
-        //
-        counter=8;
-        }
-
-        counter=16;
-        for (j=counter ; j<(counter+7)  ; j++) {
-                      canstringrecv[j]=pui8MsgDataRX[j];      }
-         //
-
-         //
-
-         counter=24;
-         for (j=counter ; j<(counter+7)  ; j++) {
-                       canstringrecv[j]=pui8MsgDataRX[j];      }
-          //
-
-          //
-
-          counter=32;
-          for (j=counter ; j<(counter+7)  ; j++) {
-                        canstringrecv[j]=pui8MsgDataRX[j];      }
-           //
-
-           //
-
-           counter=40;
-           for (j=counter ; j<(counter+7)  ; j++) {
-                         canstringrecv[j]=pui8MsgDataRX[j];      }
-            //
-
-            //
-
-            counter=48;
-            for (j=counter ; j<(counter+7)  ; j++) {
-                          canstringrecv[j]=pui8MsgDataRX[j];      }
-             //
-
-             //
-
-             counter=56;
-             for (j=counter ; j<(counter+7)  ; j++) {
-                           canstringrecv[j]=pui8MsgDataRX[j];      }
-              //
-
-              //
-
-              counter=64;
-              for (j=counter ; j<(counter+7)  ; j++) {
-                            canstringrecv[j]=pui8MsgDataRX[j];      }
-               //
-
-               //
-
-
-    }
-    else if(Idx>=79 && Idx <=86){
-        counter=0;
-        for(v=0 ; v < 2 ; v++) {
-            for (j=counter ; j<(counter+7)  ; j++) {
-                     canstringrecv[j]=pui8MsgDataRX[j];      }
-        //
-
-        //
-        counter=8;
-        }
-
-        counter=16;
-        for (j=counter ; j<(counter+7)  ; j++) {
-                      canstringrecv[j]=pui8MsgDataRX[j];      }
-         //
-
-         //
-
-         counter=24;
-         for (j=counter ; j<(counter+7)  ; j++) {
-                       canstringrecv[j]=pui8MsgDataRX[j];      }
-          //
-
-          //
-
-          counter=32;
-          for (j=counter ; j<(counter+7)  ; j++) {
-                        canstringrecv[j]=pui8MsgDataRX[j];      }
-           //
-
-           //
-
-           counter=40;
-           for (j=counter ; j<(counter+7)  ; j++) {
-                         canstringrecv[j]=pui8MsgDataRX[j];      }
-            //
-
-            //
-
-            counter=48;
-            for (j=counter ; j<(counter+7)  ; j++) {
-                          canstringrecv[j]=pui8MsgDataRX[j];      }
-             //
-
-             //
-
-             counter=56;
-             for (j=counter ; j<(counter+7)  ; j++) {
-                           canstringrecv[j]=pui8MsgDataRX[j];      }
-              //
-
-              //
-
-              counter=64;
-              for (j=counter ; j<(counter+7)  ; j++) {
-                            canstringrecv[j]=pui8MsgDataRX[j];      }
-               //
-
-               //
-
-               counter=79;
-               for (j=counter ; j<(counter+7)  ; j++) {
-                             canstringrecv[j]=pui8MsgDataRX[j];      }
-                //
-
-                //
-
-
-    }
-    else if(Idx>=87 && Idx <=94){
-        counter=0;
-        for(v=0 ; v < 2 ; v++) {
-            for (j=counter ; j<(counter+7)  ; j++) {
-                     canstringrecv[j]=pui8MsgDataRX[j];      }
-        //
-
-        //
-        counter=8;
-        }
-
-        counter=16;
-        for (j=counter ; j<(counter+7)  ; j++) {
-                      canstringrecv[j]=pui8MsgDataRX[j];      }
-         //
-
-         //
-
-         counter=24;
-         for (j=counter ; j<(counter+7)  ; j++) {
-                       canstringrecv[j]=pui8MsgDataRX[j];      }
-          //
-
-          //
-
-          counter=32;
-          for (j=counter ; j<(counter+7)  ; j++) {
-                        canstringrecv[j]=pui8MsgDataRX[j];      }
-           //
-
-           //
-
-           counter=40;
-           for (j=counter ; j<(counter+7)  ; j++) {
-                         canstringrecv[j]=pui8MsgDataRX[j];      }
-            //
-
-            //
-
-            counter=48;
-            for (j=counter ; j<(counter+7)  ; j++) {
-                          canstringrecv[j]=pui8MsgDataRX[j];      }
-             //
-
-             //
-
-             counter=56;
-             for (j=counter ; j<(counter+7)  ; j++) {
-                           canstringrecv[j]=pui8MsgDataRX[j];      }
-              //
-
-              //
-
-              counter=64;
-              for (j=counter ; j<(counter+7)  ; j++) {
-                            canstringrecv[j]=pui8MsgDataRX[j];      }
-               //
-
-               //
-
-               counter=79;
-               for (j=counter ; j<(counter+7)  ; j++) {
-                             canstringrecv[j]=pui8MsgDataRX[j];      }
-                //
-
-                //
-
-                counter=87;
-                for (j=counter ; j<(counter+7)  ; j++) {
-                              canstringrecv[j]=pui8MsgDataRX[j];      }
-                 //
-
-                 //
-
-    }
-    else if(Idx>=95 && Idx <=102){
-        counter=0;
-        for(v=0 ; v < 2 ; v++) {
-            for (j=counter ; j<(counter+7)  ; j++) {
-                     canstringrecv[j]=pui8MsgDataRX[j];      }
-        //
-
-        //
-        counter=8;
-        }
-
-        counter=16;
-        for (j=counter ; j<(counter+7)  ; j++) {
-                      canstringrecv[j]=pui8MsgDataRX[j];      }
-         //
-
-         //
-
-         counter=24;
-         for (j=counter ; j<(counter+7)  ; j++) {
-                       canstringrecv[j]=pui8MsgDataRX[j];      }
-          //
-
-          //
-
-          counter=32;
-          for (j=counter ; j<(counter+7)  ; j++) {
-                        canstringrecv[j]=pui8MsgDataRX[j];      }
-           //
-
-           //
-
-           counter=40;
-           for (j=counter ; j<(counter+7)  ; j++) {
-                         canstringrecv[j]=pui8MsgDataRX[j];      }
-            //
-
-            //
-
-            counter=48;
-            for (j=counter ; j<(counter+7)  ; j++) {
-                          canstringrecv[j]=pui8MsgDataRX[j];      }
-             //
-
-             //
-
-             counter=56;
-             for (j=counter ; j<(counter+7)  ; j++) {
-                           canstringrecv[j]=pui8MsgDataRX[j];      }
-              //
-
-              //
-
-              counter=64;
-              for (j=counter ; j<(counter+7)  ; j++) {
-                            canstringrecv[j]=pui8MsgDataRX[j];      }
-               //
-
-               //
-
-               counter=79;
-               for (j=counter ; j<(counter+7)  ; j++) {
-                             canstringrecv[j]=pui8MsgDataRX[j];      }
-                //
-
-                //
-
-                counter=87;
-                for (j=counter ; j<(counter+7)  ; j++) {
-                              canstringrecv[j]=pui8MsgDataRX[j];      }
-                 //
-
-                 //
-                 counter=95;
-                 for (j=counter ; j<(counter+7)  ; j++) {
-                               canstringrecv[j]=pui8MsgDataRX[j];      }
-                  //
-
-                  //
-
-    }
-
-
-
-    else
-    {
-    //
-    }
-
-}

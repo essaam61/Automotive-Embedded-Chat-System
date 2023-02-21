@@ -14,6 +14,5 @@
 extern char state;
 
 extern void State_Machine (void);
-extern void SimpleDelay(void);
 
 #endif

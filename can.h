@@ -14,6 +14,7 @@
 #include "inc/hw_types.h"
 #include "inc/hw_gpio.h"
 #include "uart0.h"
+#include "statemachine.h"
 
 #define MSGTX_Object 1
 #define ITX_Object 2
@@ -31,13 +32,12 @@ extern uint8_t IndexData[8];
 extern tCANMsgObject sCANMessageRX;
 extern uint8_t pui8MsgDataRX[8];
 
-extern int Idx;
-extern bool sendflag;
-extern char canstringrecv[length];
+extern char Idx;
+extern uint8_t canstringrecv[DATA_LENGTH];
 
 
 extern void CAN_Init(void);
-extern void CAN_ReceiveByte (void);
+extern void CAN_Receive (void);
 extern void CANSendByte_ErrorHandler (void);
 extern void CANReceiveByte_ErrorHandler (void);
 
